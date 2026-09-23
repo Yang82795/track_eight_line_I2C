@@ -1,44 +1,29 @@
-#ifndef __MOTOR_CAR_HPP_
-#define __MOTOR_CAR_HPP_
+#ifndef MOTOR_CAR_HPP
+#define MOTOR_CAR_HPP
 
-#include <stdio.h>
-#include <string.h>
 #include <Arduino.h>
-#include <Wire.h>                     // 包含Wire(I2C)通讯库 Include Wire library
+#include <Wire.h>
 
-
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
-// 定义电机控制引脚 Define motor control pins
-#define Motor_L_PWM 3  // 控制小车左边电机速度
-
-#define Motor_L_IN1 4  // 控制小车左边电机正反转 
+// 电机控制引脚
+#define Motor_L_PWM 3
+#define Motor_L_IN1 4
 #define Motor_L_IN2 5
+#define Motor_R_PWM 11
+#define Motor_R_IN1 9
+#define Motor_R_IN2 10
 
-#define Motor_R_PWM 11 //  控制小车右边电机速度
-
-#define Motor_R_IN1 9  // 控制小车右边电机正反转
-#define Motor_R_IN2 10  
-
-
-
-
-
-void Motor_init();
-void setMotorSpeed(uint16_t motor_forward_pin, uint16_t motor_backward_pin,uint16_t motor_pin_pwm,int motor_speed);  // 设置单个电机速度 Setting the Motor Speed
-
+void Motor_init(void);
+void StopCar(void);
+void setMotorSpeed(uint16_t motor_pin1, uint16_t motor_pin2,
+                   uint16_t motor_pin_pwm, int motor_speed);
 
 int myignore_speed(int speed);
-int limin_speed(int speed,int max,int min);
-void Set_speed(int speed_fb,int speed_lr);
+int limin_speed(int speed, int max, int min);
 
-
-#ifdef __cplusplus
-}
-#endif
+/*
+ * speed_fb: 前进/后退基准速度；speed_lr: 左右转向修正。
+ * 正 speed_lr 会使左轮更快、右轮更慢，即小车向右转。
+ */
+void Set_speed(int speed_fb, int speed_lr);
 
 #endif
