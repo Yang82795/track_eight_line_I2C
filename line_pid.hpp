@@ -1,45 +1,44 @@
-#ifndef LINE_PID_HPP
-#define LINE_PID_HPP
+#ifndef __LINE_PID_HPP_
+#define __LINE_PID_HPP_
 
+#include <stdio.h>
+#include <string.h>
 #include <Arduino.h>
+#include <Wire.h>
 #include "motor_car.hpp"
 
-/* =========================================================================
- *  8 路循迹控制核心 (I2C 红外 + 连续质心偏差 + 位置式PD + 弯道减速 +
- *                     软里程 + 事件上报)
- *
- *  传感器约定：x1 在车体最左、x8 在最右；车头朝前。
- *  本项目所用模块检测到黑线时输出 0，检测到白底时输出 1
- *  (可用 line_pid.cpp 顶部的 BLACK_IS_ZERO 反转)。
- * ========================================================================= */
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-extern uint8_t x1, x2, x3, x4, x5, x6, x7, x8;   // 8 路状态(从左往右)
+// 8路红外探头数据 (x1最左，x8最右，0=检测到黑线，1=白底)
+extern uint8_t x1, x2, x3, x4, x5, x6, x7, x8;
 
-/* ---------------- 巡线事件位(由 line_follow 返回) ---------------- */
-#define LINE_EV_NONE  0x00
-#define LINE_EV_LOST  0x01   // 本周期 8 路全白(丢线)
-#define LINE_EV_WIDE  0x02   // 本周期黑线过宽(疑似发夹/黑块/横线)
-#define LINE_EV_FULL  0x04   // 本周期 8 路全黑
+// ==========================================
+// 循迹速度与 PID 参数设置 (现场最主要调这几个)
+// ==========================================
+#define Speed_Line       (100)  // 直道标准巡线速度 (推荐 90~110)
+#define Speed_Curve      (85)   // 普通弯道速度
+#define Speed_Sharp      (70)   // 急弯/发夹弯安全降速速度 (保证急弯不冲出)
 
-void init_x_PID(void);                       // PID/里程/状态初始化
-void ResetLineController(void);              // 仅复位 PID 累积项(状态切换用)
+#define KPx              (18.5f) // 比例系数：决定转向响应灵敏度
+#define KIx              (0.0f)  // 积分系数：循迹通常为0，防止饱和
+#define KDx              (8.0f)  // 微分系数：抑制弯道摆头震荡 (注意原版公式为标准微分)
 
-/* ---------------- 传感器读取 ---------------- */
-uint8_t line_read(void);                     // 读一次 I2C，返回掩码(bit7..bit0=x1..x8)，同时刷新 x1..x8
-bool    line_read_ok(void);                  // 上一次 line_read 是否成功(I2C 未失败)
-uint8_t line_black_count(uint8_t mask);      // 掩码中压黑线的通道数(0~8)
+// ==========================================
+// 接口函数
+// ==========================================
+void I2Cdata(void);             // 读取 8 路红外 I2C 数据
+void init_x_PID(void);          // 初始化 PID 控制器与误差
+int  PID_count_x(void);         // 计算转向差速输出
+void Car_line_track(void);      // 执行一步自适应巡线
 
-/* ---------------- 巡线一步(核心) ---------------- */
-int     line_error_mm(uint8_t mask);         // 纯质心偏差(mm，正=线在车右侧)
-uint8_t line_follow(uint8_t mask);           // 正常巡线一步(含弯道减速/丢线保持/里程)，返回事件
-void    line_follow_speed(uint8_t mask, int base_speed, int target_offset_mm); // 指定速度与偏置(避障贴边用)
-void    line_set_offset(int mm);             // 目标偏置(mm，>0 让线保持在车右侧)
+bool isCrossLine(void);         // 是否检测到起终点横线 (>=6路同时黑)
+int  getBlackCount(void);       // 获取当前黑线探头数量 (0~8)
+float getLineError(void);       // 获取当前偏差量 (-7.0 ~ +7.0)
 
-/* ---------------- 查询接口(供主状态机使用) ---------------- */
-int      line_last_error_mm(void);           // 上一次有效偏差(mm，原始，未减偏置)
-int      line_last_dir(void);                // 最近"明显偏差"的方向(1右/-1左)，丢线找回用
-int      line_err_envelope_mm(void);         // 偏差包络(判断是否正在转弯)
-uint32_t line_dist_mm(void);                 // 软里程估计(mm)
-void     line_dist_reset(void);
+#ifdef __cplusplus
+}
+#endif
 
 #endif

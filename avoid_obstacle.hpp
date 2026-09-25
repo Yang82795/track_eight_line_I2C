@@ -1,30 +1,39 @@
-#ifndef AVOID_OBSTACLE_HPP
-#define AVOID_OBSTACLE_HPP
+#ifndef __AVOID_OBSTACLE_HPP_
+#define __AVOID_OBSTACLE_HPP_
 
 #include <Arduino.h>
+#include <HCSR04.h>
+#include <Servo.h>
 #include "motor_car.hpp"
 #include "line_pid.hpp"
 
-/* =========================================================================
- *  超声波 + 舵机 + 避障流程
- *
- *  障碍物随机放在循迹线任意一侧，因此绕行方向全部由"现场左右测距"决定，
- *  不写死左绕或右绕。避障时允许短时偏离循迹线(比赛规则允许)。
- *
- *  融合改进：
- *   - 采用 -ds 的 pulseIn 自测距(不依赖 HCSR04 库) + 贴边偏置通过；
- *   - 采用根目录版思想：左右净空接近时"交替绕行"，避免总往同一侧场地边界偏；
- *   - 通过阶段用线感知 PD 贴边 + 超声波确认障碍已过。
- * ========================================================================= */
+// ==========================================
+// 超声波与舵机引脚定义 (与原版完全一致)
+// ==========================================
+#define EchoPin          7
+#define TrigPin          8
+#define ServoPin         6
 
-void     avoid_init(void);          // 舵机/超声波引脚初始化
-uint16_t sonar_read_mm(void);       // 单次测距(mm)，超时(无障碍)返回 0
-bool     avoid_need(void);          // 是否需要避障(内部限频 + 连续2次确认 + 屏蔽期)
-void     avoid_blank(uint16_t ms);  // 屏蔽超声波一段时间(避免重复触发)
-void     avoid_run(void);           // 完整避障动作(扫描→偏出→贴边通过→收尾)
-int      avoid_last_side(void);     // 上次判定：+1 障碍在右(向左绕)，-1 障碍在左
-uint16_t avoid_last_dist_mm(void);  // 上次前方距离(调试用)
-uint16_t avoid_last_left_mm(void);
-uint16_t avoid_last_right_mm(void);
+// ==========================================
+// 避障动作参数 (现场可微调)
+// ==========================================
+#define SERVO_CENTER_DEG 95   // 舵机正前中位角度
+#define SERVO_LEFT_DEG   65   // 舵机向左探照角度
+#define SERVO_RIGHT_DEG  125  // 舵机向右探照角度
+
+#define AVOID_TRIGGER_CM 25   // 触发避障的前方距离阈值 (cm)
+#define AVOID_COOLDOWN_MS 1500 // 避障完成后屏蔽超声波时间，防止重复触发 (ms)
+
+// 绕障三段动作耗时参数
+#define TIME_TURN_OUT_MS 360  // 第一阶段：向开阔侧偏出时间 (ms)
+#define TIME_PASS_MS     520  // 第二阶段：直行超越障碍物时间 (ms)
+#define TIME_RECOVER_MAX 900  // 第三阶段：斜向切回寻线的最长超时时间 (ms)
+
+// ==========================================
+// 接口函数
+// ==========================================
+void Avoid_init(void);
+bool Avoid_detect(void);      // 检测前方是否有障碍 (滤波防误触)
+void Avoid_perform(void);     // 执行快速选向-弧线绕障-寻线闭环回正
 
 #endif
