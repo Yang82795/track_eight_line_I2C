@@ -1,141 +1,135 @@
 #include "line_pid.hpp"
 
+// 8 路红外状态变量
+uint8_t x1 = 1, x2 = 1, x3 = 1, x4 = 1, x5 = 1, x6 = 1, x7 = 1, x8 = 1;
 
-#define Speed_Line (90) //巡线的速度
+static float err = 0.0f;
+static float last_err = 0.0f;
+static float prev_err = 0.0f;
+static float integral_x = 0.0f;
 
-#define KPx  (22.6) //
-#define KIx  (0) //
-#define KDx  (1.) //
+static bool  g_is_cross = false;
+static int   g_black_cnt = 0;
 
+void init_x_PID(void) {
+  err = 0.0f;
+  last_err = 0.0f;
+  prev_err = 0.0f;
+  integral_x = 0.0f;
+  g_is_cross = false;
+  g_black_cnt = 0;
+}
 
-float KP_x,KI_x,KD_x; //x轴方向PID
+/**
+ * @brief 读取 8 路红外循迹模块 (I2C)
+ *        保留原版硬件厂商标准通信时序与 10ms 准备延时，稳定绝不丢帧
+ */
+void I2Cdata(void) {
+  Wire.beginTransmission(0x12); // I2C 设备地址
+  Wire.write(0x30);             // 数据寄存器
+  Wire.endTransmission();
 
+  delay(10); // 关键硬件延时：给模块内部从机单片机准备数据的时间
 
-int error_x,error_last_x,integral_x;
+  Wire.requestFrom(0x12, 1);
+  if (Wire.available()) {
+    byte data = Wire.read();
+    x1 = (data >> 7) & 0x01;
+    x2 = (data >> 6) & 0x01;
+    x3 = (data >> 5) & 0x01;
+    x4 = (data >> 4) & 0x01;
+    x5 = (data >> 3) & 0x01;
+    x6 = (data >> 2) & 0x01;
+    x7 = (data >> 1) & 0x01;
+    x8 = (data >> 0) & 0x01;
+  }
 
-int err;//红外检测线位置上的错误
+  // 统计黑线探头并计算偏差 (探头权值对称分布：-7, -5, -3, -1, 1, 3, 5, 7)
+  float sum = 0.0f;
+  int cnt = 0;
 
-void init_x_PID(void)
-{ 
-    KP_x = KPx;
-    KI_x = KIx;
-    KD_x = KDx;
+  if (x1 == 0) { sum += -7.0f; cnt++; }
+  if (x2 == 0) { sum += -5.0f; cnt++; }
+  if (x3 == 0) { sum += -3.0f; cnt++; }
+  if (x4 == 0) { sum += -1.0f; cnt++; }
+  if (x5 == 0) { sum +=  1.0f; cnt++; }
+  if (x6 == 0) { sum +=  3.0f; cnt++; }
+  if (x7 == 0) { sum +=  5.0f; cnt++; }
+  if (x8 == 0) { sum +=  7.0f; cnt++; }
 
-    error_x = 0;
-    error_last_x = 0;
-    integral_x = 0;
+  g_black_cnt = cnt;
+
+  // 1. 横线判定：有 6 路及以上同时检测到黑线，说明压在 500mm 起点/终点线上
+  if (cnt >= 6) {
+    g_is_cross = true;
+    err = 0.0f; // 横线上保持直行
+  } else {
+    g_is_cross = false;
     
+    // 2. 丢线处理：全白 (发夹弯急打或小车轻微冲出)
+    if (cnt == 0) {
+      // 沿用上一次有效偏差方向继续加大转向，快速寻回黑线
+      if (last_err > 0.5f) {
+        err = 6.0f;   // 保持向右大力拉回
+      } else if (last_err < -0.5f) {
+        err = -6.0f;  // 保持向左大力拉回
+      } else {
+        err = 0.0f;
+      }
+    } 
+    // 3. 正常压线 (1~5 路黑)：连续平滑加权
+    else {
+      err = sum / (float)cnt;
+      last_err = err;
+    }
+  }
 }
 
+/**
+ * @brief 标准位置式 PID 计算转向差速
+ */
+int PID_count_x(void) {
+  float d_err = err - prev_err;
+  
+  integral_x += err;
+  if (integral_x > 30.0f)  integral_x = 30.0f;
+  if (integral_x < -30.0f) integral_x = -30.0f;
 
+  float pwm_out = (err * KPx) + (integral_x * KIx) + (d_err * KDx);
+  prev_err = err;
 
-
-int PID_count_x(void)
-{
-    int pwmoutx = 0;
-    //这里求算错误
-    LineWalking();
-
-    error_x = err - 0; //0:代表在线中间
-//    Serial.println(error_x);
-    
-    //位置式
-    pwmoutx = error_x * KP_x + integral_x *KI_x + error_last_x *KD_x ;
-
-    integral_x += error_x; 
-    error_last_x = error_x;
-
-    if(integral_x > 30)
-        integral_x = 30;
-    else if(integral_x < -30)
-        integral_x = -30; 
-
-    return pwmoutx;
+  return (int)pwm_out;
 }
 
-//x1-x8 从左往右数
-uint8_t x1,x2,x3,x4,x5,x6,x7,x8;
-void LineWalking(void)
-{
-  if(x1 == 1 && x2 == 1  && x3 == 1&& x4 == 0 && x5 == 1 && x6 == 1  && x7 == 1 && x8 == 1) // 1110 1111
-	{
-		err = -1;
-	}
-	else if(x1 == 1 && x2 == 1  && x3 == 0&& x4 == 0 && x5 == 1 && x6 == 1  && x7 == 1 && x8 == 1) // 1100 1111
-	{
-		err = -2;
-	}
-	else if(x1 == 1 && x2 == 1  && x3 == 0&& x4 == 1 && x5 == 1 && x6 == 1  && x7 == 1 && x8 == 1) // 1101 1111
-	{
-		err = -2;
-	}
-	
-	else if(x1 == 1 && x2 == 0  && x3 == 1&& x4 == 1 && x5 == 1 && x6 == 1  && x7 == 1 && x8 == 1) // 1011 1111
-	{
-		err = -3;
-	}
-	else if(x1 == 1 && x2 == 0  && x3 == 0&& x4 == 1 && x5 == 1 && x6 == 1  && x7 == 1 && x8 == 1) // 1001 1111
-	{
-		err = -3;
-	}
-		else if(x1 == 0 && x2 == 0  && x3 == 1&& x4 == 1 && x5 == 1 && x6 == 1  && x7 == 1 && x8 == 1) // 0011 1111
-	{
-		err = -4;  
-	}
-	else if(x1 == 0 && x2 == 1  && x3 == 1&& x4 == 1 && x5 == 1 && x6 == 1  && x7 == 1 && x8 == 1) // 0111 1111
-	{
-		err = -4; 
-	}
+/**
+ * @brief 自适应弯道巡线
+ *        直道全速提高时间分；急弯自适应降速保障绝对稳定性
+ */
+void Car_line_track(void) {
+  int steer_pwm = PID_count_x();
 
-	
-	else if(x1 == 1 && x2 == 1  && x3 == 1&& x4 == 1 && x5 == 0 && x6 == 1  && x7 == 1 && x8 == 1) // 1111 0111
-	{
-		err = 1;
-	} 
-	else if(x1 == 1 && x2 == 1  && x3 == 1&& x4 == 1 && x5 == 0 && x6 == 0  && x7 == 1 && x8 == 1) // 1111 0011
-	{
-		err = 2;
-	}
-	else if(x1 == 1 && x2 == 1  && x3 == 1&& x4 == 1 && x5 == 1 && x6 == 0  && x7 == 1 && x8 == 1) // 1111 1011
-	{
-		err = 2;
-	}
-	else if(x1 == 1 && x2 == 1  && x3 == 1&& x4 == 1 && x5 == 1 && x6 == 0  && x7 == 0 && x8 == 1) // 1111 1001
-	{
-		err = 3;
-	}
-	
-	else if(x1 == 1 && x2 == 1  && x3 == 1&& x4 == 1 && x5 == 1 && x6 == 1  && x7 == 0 && x8 == 1) // 1111 1101
-	{
-		err = 3;
-	}
-	else if(x1 == 1 && x2 == 1  && x3 == 1&& x4 == 1 && x5 == 1 && x6 == 1  && x7 == 0 && x8 == 0) // 1111 1100
-	{
-		err = 4; 
-	}
-		else if(x1 == 1 && x2 == 1  && x3 == 1&& x4 == 1 && x5 == 1 && x6 == 1  && x7 == 1 && x8 == 0) // 1111 1110
-	{
-		err = 4; 
-	}
-	
+  float abs_err = fabs(err);
+  int base_speed = Speed_Line;
 
-	
- 
-	else if(x1 == 1 &&x2 == 1 &&x3 == 1 && x4 == 0 && x5 == 0 && x6 == 1 && x7 == 1&& x8 == 1) //直走
-	{
-		err = 0;
-	}
-	
-	//剩下的就保持上一个状态	
+  if (abs_err <= 1.5f) {
+    base_speed = Speed_Line;   // 直道全速
+  } else if (abs_err <= 3.5f) {
+    base_speed = Speed_Curve;  // 普通弯道微降速
+  } else {
+    base_speed = Speed_Sharp;  // 急弯/发夹弯大降速保证抓地与转弯灵敏度
+  }
+
+  Set_speed(base_speed, steer_pwm);
 }
 
-
-
-void Car_line_track(void)
-{
-    int PWMx;
-    PWMx = PID_count_x();
-
-    Set_speed(Speed_Line,PWMx); //传入值即可
+bool isCrossLine(void) {
+  return g_is_cross;
 }
 
+int getBlackCount(void) {
+  return g_black_cnt;
+}
+
+float getLineError(void) {
+  return err;
+}

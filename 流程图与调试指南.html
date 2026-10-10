@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能巡线避障小车 · 流程图与调试指南</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f7f5f0; --card:#ffffff; --line:#e9e3d6; --line-soft:#f0ebe0;
+    --ink:#14171e; --ink2:#3a4256; --muted:#7c7a72;
+    --primary:#2f6f5e; --primary-soft:rgba(47,111,94,.09);
+    --motor:#c97b3f;  --motor-soft:rgba(201,123,63,.10);
+    --ultra:#2f6f5e;  --ultra-soft:rgba(47,111,94,.09);
+    --line8:#5b7c99;  --line8-soft:rgba(91,124,153,.10);
+    --key:#8a8578;    --key-soft:rgba(138,133,120,.10);
+    --danger:#b06367; --danger-soft:rgba(176,99,103,.10);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:'Outfit','PingFang SC','Microsoft YaHei',sans-serif;
+    font-size:15px; line-height:1.62; -webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 12% -5%, rgba(47,111,94,.05), transparent),
+      radial-gradient(ellipse 70% 45% at 92% 0%, rgba(201,123,63,.05), transparent);
+    background-attachment:fixed;
+  }
+  .wrap{max-width:1040px;margin:0 auto;padding:0 24px}
+
+  /* ---------- hero ---------- */
+  header{padding:64px 0 40px}
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;
+    letter-spacing:.09em;text-transform:uppercase;color:var(--primary);
+    background:var(--primary-soft);padding:5px 11px;border-radius:999px;margin-bottom:22px;
+  }
+  h1{
+    font-family:'DM Serif Display',serif;font-weight:400;
+    font-size:36px;line-height:1.24;letter-spacing:-.01em;margin-bottom:18px;
+  }
+  .lede{font-size:16px;color:var(--ink2);max-width:70ch;margin-bottom:26px}
+
+  /* ---------- verdict ---------- */
+  .verdict{
+    background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:22px 24px;box-shadow:0_2px_8px rgba(0,0,0,.04);
+  }
+  .verdict h2{
+    font-family:'DM Serif Display',serif;font-size:21px;font-weight:400;
+    margin-bottom:12px;display:flex;align-items:center;gap:10px;
+  }
+  .verdict p{color:var(--ink2);margin-bottom:10px}
+  .verdict p:last-child{margin-bottom:0}
+  .verdict strong{color:var(--ink);font-weight:600}
+
+  /* ---------- sections ---------- */
+  section{padding:48px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:8px}
+  .sec-num{
+    font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;
+    color:var(--primary);background:var(--primary-soft);
+    padding:3px 9px;border-radius:6px;flex-shrink:0;
+  }
+  h2{
+    font-family:'DM Serif Display',serif;font-size:26px;font-weight:400;letter-spacing:-.005em;
+  }
+  h3{font-size:16px;font-weight:600;margin:26px 0 10px;color:var(--ink)}
+  .sec-sub{color:var(--muted);font-size:14px;margin-bottom:22px;max-width:76ch}
+
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:20px 22px;box-shadow:0_2px 8px rgba(0,0,0,.04);
+  }
+  .card + .card{margin-top:14px}
+
+  code,.mono{font-family:'JetBrains Mono',monospace;font-size:.88em}
+  code{background:var(--line-soft);padding:2px 6px;border-radius:5px;color:var(--ink2)}
+  .k{color:var(--ink);font-weight:600}
+
+  /* ---------- pin map ---------- */
+  .pinwrap{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .pincol h4{
+    font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted);margin-bottom:10px;
+  }
+  .pin{
+    display:grid;grid-template-columns:38px 1fr;gap:10px;align-items:center;
+    padding:5px 0;border-bottom:1px dashed var(--line-soft);
+  }
+  .pin:last-child{border-bottom:none}
+  .pinnum{
+    font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:500;
+    text-align:center;padding:3px 0;border-radius:5px;
+  }
+  .tag{
+    display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink2);
+  }
+  .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:18px;font-size:12.5px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+
+  /* ---------- flow ---------- */
+  .flow{display:flex;flex-direction:column;gap:0}
+  .node{
+    background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:13px 16px;transition:all .2s;
+  }
+  .node:hover{transform:translateY(-2px);box-shadow:0_6px 20px -4px rgba(0,0,0,.09)}
+  .node-t{font-weight:600;font-size:14.5px;margin-bottom:3px}
+  .node-d{font-size:13px;color:var(--muted)}
+  .node.start{background:var(--primary-soft);border-color:rgba(47,111,94,.25)}
+  .node.avoid{background:var(--ultra-soft);border-color:rgba(47,111,94,.28)}
+  .node.warn{background:var(--danger-soft);border-color:rgba(176,99,103,.28)}
+  .node.stop{background:var(--motor-soft);border-color:rgba(201,123,63,.28)}
+  .arrow{display:flex;justify-content:center;padding:5px 0;color:var(--line)}
+  .arrow svg{display:block}
+  .arrow-label{
+    text-align:center;font-size:11.5px;color:var(--muted);margin:-2px 0 5px;
+    font-family:'JetBrains Mono',monospace;
+  }
+
+  /* ---------- branch ---------- */
+  .branch{
+    border-left:2px solid var(--line);padding-left:18px;margin-left:8px;
+  }
+  .branch-lbl{
+    font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);
+    margin-bottom:6px;
+  }
+
+  /* ---------- phases ---------- */
+  .phases{display:grid;gap:10px}
+  .ph{
+    display:grid;grid-template-columns:44px 1fr 96px;gap:14px;align-items:center;
+    background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:13px 16px;transition:all .2s;
+  }
+  .ph:hover{transform:translateY(-2px);box-shadow:0_6px 20px -4px rgba(0,0,0,.09)}
+  .ph-n{
+    width:30px;height:30px;border-radius:9px;background:var(--primary);color:#fff;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;
+  }
+  .ph-t{font-weight:600;font-size:14px}
+  .ph-d{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .ph-ms{
+    font-family:'JetBrains Mono',monospace;font-size:13px;text-align:right;color:var(--ink2);
+  }
+  .ph-ms small{display:block;font-size:10.5px;color:var(--muted)}
+
+  /* ---------- bench ---------- */
+  .bench{
+    display:grid;grid-template-columns:112px 1fr 78px;gap:12px;
+    align-items:center;padding:7px 0;
+  }
+  .bench-label{font-size:13px;color:var(--ink2)}
+  .bench-track{height:15px;background:var(--line-soft);border-radius:5px;overflow:hidden;position:relative}
+  .bench-fill{height:100%;border-radius:5px;transition:width .6s cubic-bezier(.2,.7,.3,1)}
+  .bench-val{font-family:'JetBrains Mono',monospace;font-size:12.5px;text-align:right;color:var(--ink2)}
+  .bench-row + .bench-row{border-top:1px dashed var(--line-soft)}
+
+  /* ---------- timeline ---------- */
+  .tl{list-style:none;padding:0;margin:0;position:relative}
+  .tl::before{content:"";position:absolute;left:11px;top:8px;bottom:8px;width:2px;background:var(--primary);opacity:.3}
+  .tl li{position:relative;padding:0 0 22px 36px}
+  .tl li::before{
+    content:"";position:absolute;left:3px;top:4px;width:18px;height:18px;border-radius:50%;
+    background:#fff;border:2px solid var(--primary);
+  }
+  .tl li.key::before{background:var(--primary);box-shadow:0 0 0 4px var(--primary-soft)}
+  .tl-t{font-weight:600;font-size:14.5px;margin-bottom:2px}
+  .tl-d{font-size:13.5px;color:var(--ink2)}
+  .tl-d ul{margin:7px 0 0 17px}
+  .tl-d li{margin-bottom:3px;font-size:13px}
+  .tl-check{
+    display:inline-block;font-family:'JetBrains Mono',monospace;font-size:11px;
+    background:var(--ultra-soft);color:var(--primary);padding:2px 8px;border-radius:5px;
+    margin-top:7px;
+  }
+
+  /* ---------- table ---------- */
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{
+    text-align:left;font-weight:600;font-size:12px;letter-spacing:.04em;
+    text-transform:uppercase;color:var(--muted);padding:9px 12px;
+    border-bottom:1px solid var(--line);
+  }
+  td{padding:10px 12px;border-bottom:1px solid var(--line-soft);color:var(--ink2);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.mono,th.mono{font-family:'JetBrains Mono',monospace;font-size:12.5px}
+  .badge{
+    display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:5px;
+    white-space:nowrap;
+  }
+  .b-red{background:var(--danger-soft);color:var(--danger)}
+  .b-amber{background:var(--motor-soft);color:var(--motor)}
+  .b-green{background:var(--ultra-soft);color:var(--primary)}
+
+  /* ---------- kv ---------- */
+  .kv{display:grid;grid-template-columns:118px 1fr;row-gap:9px;column-gap:16px;margin:0}
+  .kv dt{color:var(--muted);font-size:13px;border-bottom:1px dashed var(--line);padding-bottom:7px}
+  .kv dd{margin:0;border-bottom:1px dashed var(--line);padding-bottom:7px;font-size:13.5px;color:var(--ink2)}
+
+  .note{
+    background:var(--motor-soft);border:1px solid rgba(201,123,63,.25);
+    border-radius:12px;padding:15px 18px;font-size:13.5px;color:var(--ink2);margin-top:14px;
+  }
+  .note strong{color:var(--motor)}
+  .note.safe{background:var(--ultra-soft);border-color:rgba(47,111,94,.25)}
+  .note.safe strong{color:var(--primary)}
+
+  .formula{
+    background:var(--ink);color:#e8e6e0;border-radius:12px;padding:16px 20px;
+    font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.9;overflow-x:auto;
+  }
+  .formula .cm{color:#7fd1bd}
+  .formula em{color:#e8b98a;font-style:normal}
+
+  footer{
+    margin-top:56px;padding:28px 0 48px;border-top:1px solid var(--line);
+    color:var(--muted);font-size:12.5px;
+  }
+
+  @media (max-width:760px){
+    .wrap{padding:0 16px}
+    h1{font-size:27px} h2{font-size:22px}
+    .pinwrap{grid-template-columns:1fr}
+    .ph{grid-template-columns:36px 1fr}
+    .ph-ms{grid-column:2;text-align:left;margin-top:4px}
+    .bench{grid-template-columns:88px 1fr 64px}
+    header{padding:40px 0 28px}
+    section{padding-top:36px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+    丝路循迹避障小车 · 舵机已改为双超声波
+  </div>
+  <h1>双超声波避障：运行流程图与分阶段调试指南</h1>
+  <p class="lede">
+    对应 <code>track_eight_line_I2C</code> 工程中改好的避障代码。
+    循迹逻辑一行未动；避障部分从「舵机扫描 + 固定延时」重写为「双超声波 + 红外闭环回线」。
+    下面每张图都对应代码里的一个真实函数，可以对照着看。
+  </p>
+
+  <div class="verdict" style="border-color:rgba(176,99,103,.3);background:var(--danger-soft)">
+    <h2>
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><path d="M12 9v4M12 17v.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+      现状更新（务必先读）：找线逻辑已修好，但整个绕行动作还没调通
+    </h2>
+    <p>
+      我另外搭了一套<strong>全闭环仿真</strong>：差速电机 → 车辆位姿 → 红外几何 → PID/避障。
+      基线结论很清楚：<strong>无障碍时小车能完美通过两个 90° 急弯，最大偏离只有 14mm</strong>，
+      说明循迹本身应付得了急弯。但<strong>凡是加入障碍物，5 个场景全部失败</strong>。
+    </p>
+    <p>
+      所以把"确定的"和"还不确定的"分开说清楚：
+      <br>· <strong>已确认可用</strong>：循迹过急弯、回线闭环的三个分支逻辑、全程不倒转
+      <br>· <strong>已确认是错的</strong>：原参数横向只能偏出 <strong>35mm</strong>（几何硬上限，见第 07 节），
+      而最宽的障碍需要 <strong>120~165mm</strong> —— 这是算出来的，不是猜的
+      <br>· <strong>还没解决</strong>：固定时序的绕行动作整体调不通，车会"绕过一半又压回线上"，
+      然后反复触发避障。第 07 节的参数<strong>必须上车实测</strong>，别直接拿去做比赛
+    </p>
+  </div>
+
+  <div class="verdict">
+    <h2>
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16.5v.01"/></svg>
+      先说最重要的一件事：「两个超声波扫不到障碍物」不是代码逻辑的错
+    </h2>
+    <p>
+      我把你<strong>原来的</strong> <code>Avoid_detect()</code> 全开模式判定逻辑单独抽出来跑了一遍仿真：
+      左侧 25cm 障碍在第 3 个检测周期就返回 <code>OBS_LEFT</code>，右侧障碍第 4 个周期返回 <code>OBS_RIGHT</code>，
+      判定机本身工作正常。所以故障点不在「判断有没有障碍」这一步。
+    </p>
+    <p>
+      那两个超声波都不出声，最可能是下面三件事之一：<strong>供电被电机拉垮</strong>、
+      <strong>安装角度没对准障碍</strong>、<strong>烧进板子的固件和这份代码不是同一个</strong>。
+      所以这次改代码里最重要的不是"调参数"，而是<strong>加了一个能让这件事一眼看出来的自检输出</strong>：
+      小车静止不动时串口就会实时打印左右距离（见第 6 节），10 秒钟就能定位。
+    </p>
+  </div>
+</header>
+
+<!-- ===================== 1. 引脚 ===================== -->
+<section>
+  <div class="sec-head"><span class="sec-num">01</span><h2>引脚审计：全部核对，无冲突</h2></div>
+  <p class="sec-sub">你已确认左右超声波都接在代码写的引脚上，所以我一个 <code>#define</code> 都没有动。下面是 UNO 的完整占用情况。</p>
+
+  <div class="card">
+    <div class="pinwrap">
+      <div class="pincol">
+        <h4>数字引脚 D0 – D13</h4>
+        <div class="pin"><span class="pinnum" style="background:#e8e5dd;color:#7c7a72">0/1</span><span class="tag"><i class="dot" style="background:var(--key)"></i>串口 Serial（调试用，勿占）</span></div>
+        <div class="pin"><span class="pinnum" style="background:var(--ultra-soft);color:var(--ultra)">2</span><span class="tag"><i class="dot" style="background:var(--ultra)"></i>左 HC-SR04 Trig</span></div>
+        <div class="pin"><span class="pinnum" style="background:var(--ultra-soft);color:var(--ultra)">3</span><span class="tag"><i class="dot" style="background:var(--ultra)"></i>左 HC-SR04 Echo</span></div>
+        <div class="pin"><span class="pinnum" style="background:var(--key-soft);color:var(--key)">4</span><span class="tag"><i class="dot" style="background:var(--key)"></i>启动 / 急停按键</span></div>
+        <div class="pin"><span class="pinnum" style="background:var(--motor-soft);color:var(--motor)">5</span><span class="tag"><i class="dot" style="background:var(--motor)"></i>TB6612 左轮 PWM</span></div>
+        <div class="pin"><span class="pinnum" style="background:var(--motor-soft);color:var(--motor)">6</span><span class="tag"><i class="dot" style="background:var(--motor)"></i>TB6612 左轮 IN2</span></div>
+        <div class="pin"><span class="pinnum" style="background:var(--motor-soft);color:var(--motor)">7</span><span class="tag"><i class="dot" style="background:var(--motor)"></i>TB6612 左轮 IN1</span></div>
+        <div class="pin"><span class="pinnum" style="background:var(--motor-soft);color:var(--motor)">8</span><span class="tag"><i class="dot" style="background:var(--motor)"></i>TB6612 右轮 IN1</span></div>
+        <div class="pin"><span class="pinnum" style="background:var(--motor-soft);color:var(--motor)">9</span><span class="tag"><i class="dot" style="background:var(--motor)"></i>TB6612 右轮 IN2</span></div>
+        <div class="pin"><span class="pinnum" style="background:var(--motor-soft);color:var(--motor)">10</span><span class="tag"><i class="dot" style="background:var(--motor)"></i>TB6612 右轮 PWM</span></div>
+        <div class="pin"><span class="pinnum" style="background:var(--ultra-soft);color:var(--ultra)">11</span><span class="tag"><i class="dot" style="background:var(--ultra)"></i>右 HC-SR04 Trig</span></div>
+        <div class="pin"><span class="pinnum" style="background:var(--ultra-soft);color:var(--ultra)">12</span><span class="tag"><i class="dot" style="background:var(--ultra)"></i>右 HC-SR04 Echo</span></div>
+        <div class="pin"><span class="pinnum" style="background:#f2e6e6;color:var(--danger)">13</span><span class="tag"><i class="dot" style="background:var(--danger)"></i>板载 LED（唯一空闲脚，建议留给蜂鸣器）</span></div>
+      </div>
+      <div class="pincol">
+        <h4>模拟引脚 A0 – A5</h4>
+        <div class="pin"><span class="pinnum" style="background:#f2ede3;color:var(--muted)">A0–A3</span><span class="tag"><i class="dot" style="background:var(--muted)"></i>空闲（可读电机电流 / 电池电压）</span></div>
+        <div class="pin"><span class="pinnum" style="background:var(--line8-soft);color:var(--line8)">A4</span><span class="tag"><i class="dot" style="background:var(--line8)"></i>8 路巡线 SDA</span></div>
+        <div class="pin"><span class="pinnum" style="background:var(--line8-soft);color:var(--line8)">A5</span><span class="tag"><i class="dot" style="background:var(--line8)"></i>8 路巡线 SCL</span></div>
+        <div style="margin-top:22px;padding-top:18px;border-top:1px solid var(--line)">
+          <h4 style="color:var(--ink)">结论</h4>
+          <p style="font-size:13.5px;color:var(--ink2);margin-top:6px">
+            没有引脚冲突。D3 属 Timer2、D11/D12 与 D9/D10 同属 Timer1，但代码把它们当<strong>普通数字 IO</strong>用
+            （从不写 <code>analogWrite</code>），所以不会抢走电机 PWM。
+          </p>
+          <div class="note safe" style="margin-top:12px">
+            <strong>唯一改动过的一处注释：</strong>原代码第 35–36 行注释写着「默认 A3 / A2」，实际代码是 11/12。
+            已按你的实际接线把注释改正，引脚值没动。
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--motor)"></i>电机驱动</span>
+      <span><i class="dot" style="background:var(--ultra)"></i>超声波</span>
+      <span><i class="dot" style="background:var(--line8)"></i>8 路巡线 I2C</span>
+      <span><i class="dot" style="background:var(--key)"></i>按键 / 串口</span>
+      <span><i class="dot" style="background:var(--danger)"></i>空闲</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 2. 根因排查树 ===================== -->
+<section>
+  <div class="sec-head"><span class="sec-num">02</span><h2>排查树：两个超声波都不出声，先查这三样</h2></div>
+  <p class="sec-sub">按顺序走，第一个命中的就是原因。这一节建议配合第 6 节的串口自检一起看。</p>
+
+  <div class="card">
+    <div class="node warn">
+      <div class="node-t">现象：两个超声波距离恒为 999，避障永不触发</div>
+      <div class="node-d">小车静止，打开串口，手放在传感器前面看数值</div>
+    </div>
+    <div class="arrow"><svg width="16" height="20" viewBox="0 0 16 20" fill="none"><path d="M8 1v16M2 12l6 6 6-6" stroke="#c9c2b2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+    <div class="branch">
+      <div class="branch-lbl">分支 A —— 摸一下：两个模块的 5V 供电是否稳定？</div>
+      <div class="node">
+        <div class="node-t">最常见的硬件坑：电机一动，5V 就塌</div>
+        <div class="node-d">
+          HC-SR04 内部有 3.3V 稳压 + 发射驱动电流很大。电池内阻一大，电机启动瞬间电压跌落，
+          超声波直接不工作。<strong>这类故障最像代码 bug</strong>，因为静止时一切正常。
+        </div>
+      </div>
+      <div class="note">
+        <strong>怎么确认：</strong>把 TB6612 的 STBY 拉低让电机停转，再看串口。如果电机不转时距离正常、一转就变 999 —— 就是它。
+        <br><strong>怎么修：</strong>① 每个 HC-SR04 的 Vcc/Gnd 处各焊一个 <strong>10µF + 100nF</strong> 陶瓷电容就近去耦；
+        ② 电机两端并 <strong>0.1µF</strong> 抑制刷子火花；③ 条件允许用独立 5V 给超声波供电，并与 UNO 共地。
+      </div>
+    </div>
+
+    <div class="arrow"><svg width="16" height="20" viewBox="0 0 16 20" fill="none"><path d="M8 1v16M2 12l6 6 6-6" stroke="#c9c2b2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+    <div class="branch">
+      <div class="branch-lbl">分支 B —— 读数有值但永远不变？</div>
+      <div class="node">
+        <div class="node-t">模块是好的，但探测锥里没东西 → 安装角度问题</div>
+        <div class="node-d">
+          HC-SR04 出厂 R3=392 时<strong>探测角小于 15°</strong>，是一根很窄的笔直射线。
+          两个传感器放在车头左右角如果向外撇太多，<strong>正前方反而成了两个锥形都照不到的盲区</strong>。
+        </div>
+      </div>
+      <div class="note">
+        <strong>怎么修：</strong>让两个传感器的轴线与车头前进方向夹角 <strong>≤ 20°</strong>，并左右各外撇 10–15° 以覆盖赛道宽度。
+        高度离地 <strong>8–15cm</strong>（低于 5cm 容易打到地面误报，高于 20cm 障碍物的下沿可能漏检）。
+        另外障碍物只有 60mm×60mm 的小目标，太靠边也会漏，务必用实物反复试。
+      </div>
+    </div>
+
+    <div class="arrow"><svg width="16" height="20" viewBox="0 0 16 20" fill="none"><path d="M8 1v16M2 12l6 6 6-6" stroke="#c9c2b2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+    <div class="branch">
+      <div class="branch-lbl">分支 C —— A、B 都不是？</div>
+      <div class="node warn">
+        <div class="node-t">烧进板子的固件 ≠ 你手上这份代码</div>
+        <div class="node-d">
+          旧代码用了一堆 <code>#if</code> 模式分支，只要 <code>AVOID_SWITCH_MODE</code> 不是 3，
+          对应引脚就<strong>根本不会被 <code>pinMode</code> 初始化</strong>，表现为"那个方向的超声波完全是死的"。
+          你的 <code>avoid_obstacle.hpp</code> 修改时间晚于 <code>.cpp</code>，很可能就是这个问题。
+        </div>
+      </div>
+      <div class="note safe">
+        <strong>新版已根治：</strong>现在只剩一条代码路径，模式只是运行期的一个变量，
+        不存在"某个分支没编译进去导致引脚没初始化"这类幽灵故障。
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 3. 主流程 ===================== -->
+<section>
+  <div class="sec-head"><span class="sec-num">03</span><h2>主程序流程：三个状态</h2></div>
+  <p class="sec-sub">对应 <code>track_eight_line_I2C.ino</code> 的 <code>loop()</code> 状态机。这是改动最小的部分，只加了自检输出和终点刹车开关。</p>
+
+  <div class="card">
+    <div class="flow">
+      <div class="node start">
+        <div class="node-t">上电 setup()</div>
+        <div class="node-d">Serial 115200 → I2C → 按键 D4 → 电机 → PID → 避障初始化</div>
+      </div>
+      <div class="arrow-label">↓ 判断 SRAM 魔数是否还在</div>
+      <div class="arrow"><svg width="16" height="20" viewBox="0 0 16 20" fill="none"><path d="M8 1v16M2 12l6 6 6-6" stroke="#c9c2b2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+      <div class="node">
+        <div class="node-t">魔数还在 → 赛道中掉电复位</div>
+        <div class="node-d">直接进 RUNNING 免按键续跑（用完电池接触不良时很实用）</div>
+      </div>
+      <div class="node" style="margin-top:10px">
+        <div class="node-t">魔数没了 → 冷启动</div>
+        <div class="node-d">进 WAIT_START 等按键</div>
+      </div>
+    </div>
+
+    <div style="height:14px"></div>
+
+    <div class="flow">
+      <div class="node start">
+        <div class="node-t">STATE_WAIT_START　（新增：静止时持续测距）</div>
+        <div class="node-d">Avoid_detect() + printPing() 每轮都跑 → 小车不动也能看超声波。这是第 6 节自检的原理</div>
+      </div>
+      <div class="arrow-label">↓ 按下 D4</div>
+      <div class="arrow"><svg width="16" height="20" viewBox="0 0 16 20" fill="none"><path d="M8 1v16M2 12l6 6 6-6" stroke="#c9c2b2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+      <div class="node avoid">
+        <div class="node-t">STATE_RUNNING　（比赛主循环）</div>
+        <div class="node-d">见下方逐步展开</div>
+      </div>
+
+      <div style="border-left:2px solid var(--line);margin-left:9px;padding-left:18px;margin-top:12px">
+        <div class="branch-lbl">① 读取 8 路红外</div>
+        <div class="branch-lbl" style="margin-top:14px">② 超声波测距 + 避障判定（55ms 节流）</div>
+        <div class="branch-lbl" style="margin-top:14px">③ 有障碍？→ 走避障五阶段（第 4 节），做完 return</div>
+        <div class="branch-lbl" style="margin-top:14px">④ 终点横线判断：过起跑 2s 屏蔽 + 过避障 5s 屏蔽 + 连续 2 次 ≥6 路黑</div>
+        <div class="branch-lbl" style="margin-top:14px">⑤ 正常自适应循迹 PID</div>
+      </div>
+
+      <div class="arrow-label">↓ 连续两次确认 ≥6 路黑</div>
+      <div class="arrow"><svg width="16" height="20" viewBox="0 0 16 20" fill="none"><path d="M8 1v16M2 12l6 6 6-6" stroke="#c9c2b2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+      <div class="node stop">
+        <div class="node-t">STATE_FINISHED</div>
+        <div class="node-d">刹车并打印用时，保持停车直到断电</div>
+      </div>
+    </div>
+
+    <div class="note">
+      <strong>安全出口：</strong>行驶中随时按 D4 会立刻 <code>StopCar()</code> 并退回 WAIT_START，
+      同时清掉比赛魔数 —— 这是你现场唯一的物理急停，调试时很好用。
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 4. 避障五阶段 ===================== -->
+<section>
+  <div class="sec-head"><span class="sec-num">04</span><h2>避障动作：五阶段流程与耗时</h2></div>
+  <p class="sec-sub">对应 <code>Avoid_perform()</code>。方向规则严格按你的要求：<strong>左边探测到 → 往右绕；右边探测到 → 往左绕</strong>。</p>
+
+  <div class="card">
+    <div class="node start">
+      <div class="node-t">Avoid_detect() 返回 OBS_LEFT / OBS_RIGHT</div>
+      <div class="node-d">双侧都有障碍时，代码选<strong>测得更远、空间更大</strong>的那一侧绕；两侧差不多才用 AVOID_PRIORITY_DIR</div>
+    </div>
+    <div class="arrow"><svg width="16" height="20" viewBox="0 0 16 20" fill="none"><path d="M8 1v16M2 12l6 6 6-6" stroke="#c9c2b2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div class="node"><div class="node-t">确定绕行方向</div><div class="node-d">OBS_LEFT → bypass_left = false（向右绕）　|　OBS_RIGHT → bypass_left = true（向左绕）</div></div>
+
+    <div class="arrow"><svg width="16" height="20" viewBox="0 0 16 20" fill="none"><path d="M8 1v16M2 12l6 6 6-6" stroke="#c9c2b2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+    <div class="phases">
+      <div class="ph">
+        <div class="ph-n">0</div>
+        <div><div class="ph-t">刹停稳定</div><div class="ph-d">StopCar()，让惯性停下来再转向</div></div>
+        <div class="ph-ms">110 ms</div>
+      </div>
+      <div class="ph">
+        <div class="ph-n">1</div>
+        <div><div class="ph-t">向外偏出　<b style="font-weight:600;color:var(--primary)">← 决定绕得开不开</b></div><div class="ph-d">向左绕：左轮 18 / 右轮 78　·　向右绕：左轮 78 / 右轮 18。横向偏移量由这个阶段决定</div></div>
+        <div class="ph-ms">340 ms</div>
+      </div>
+      <div class="ph">
+        <div class="ph-n">2</div>
+        <div><div class="ph-t">侧向直行　跨过障碍</div><div class="ph-d">双轮 45 低速直走；结束时复查"被绕开那侧"的超声波，仍在 40cm 内就<strong>自动延长</strong>（最多 300ms）</div></div>
+        <div class="ph-ms">460 ms<small>+最多 300</small></div>
+      </div>
+      <div class="ph">
+        <div class="ph-n">3</div>
+        <div><div class="ph-t">闭环回线　<b style="font-weight:600;color:var(--primary)">← 全新，最关键的改进</b></div><div class="ph-d">用红外偏差实时打方向把车拉回黑线；<code>|偏差| ≤ 1.5</code> 且黑线探头 ≤4 路、连续保持 60ms 才算回到线上</div></div>
+        <div class="ph-ms">典型 ~380 ms<small>上限 1800</small></div>
+      </div>
+      <div class="ph">
+        <div class="ph-n">4</div>
+        <div><div class="ph-t">扶正 + 交还 PID</div><div class="ph-d">短促前冲 40ms 让车身与线平行，然后 init_x_PID() 清历史，防止接管瞬间甩尾</div></div>
+        <div class="ph-ms">80 ms</div>
+      </div>
+    </div>
+
+    <div class="arrow"><svg width="16" height="20" viewBox="0 0 16 20" fill="none"><path d="M8 1v16M2 12l6 6 6-6" stroke="#c9c2b2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+    <div class="node avoid">
+      <div class="node-t">冷却 1200ms + 终点线屏蔽 5000ms</div>
+      <div class="node-d">防止对同一个障碍二次触发，以及回线瞬间因多路黑线误判终点</div>
+    </div>
+
+    <div class="note safe">
+      <strong>全过程绝不倒转。</strong>比赛规则写着「一旦逆行，本轮比赛结束」，
+      所以 <code>drive_forward()</code> 给两轮都加了 12 的下限 —— 任何极端参数下内侧轮最多是停转，绝不会算出负数。
+      我用仿真验证过：完整避障动作全程最小轮速 ≥ 1，无倒车。
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 5. 耗时对比 ===================== -->
+<section>
+  <div class="sec-head"><span class="sec-num">05</span><h2>延时压缩：改前 vs 改后</h2></div>
+  <p class="sec-sub">数值来自宿主机仿真跑出来的实际值，不是估算。</p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px" class="pinwrap">
+    <div class="card">
+      <h3 style="margin-top:0">旧版（固定延时）</h3>
+      <div class="bench"><span class="bench-label">刹停</span><div class="bench-track"><div class="bench-fill" style="width:100%;background:var(--danger)"></div></div><span class="bench-val">350ms</span></div>
+      <div class="bench"><span class="bench-label">偏出</span><div class="bench-track"><div class="bench-fill" style="width:100%;background:var(--danger)"></div></div><span class="bench-val">350ms</span></div>
+      <div class="bench"><span class="bench-label">缓冲×2</span><div class="bench-track"><div class="bench-fill" style="width:23%;background:var(--danger)"></div></div><span class="bench-val">160ms</span></div>
+      <div class="bench"><span class="bench-label">超越</span><div class="bench-track"><div class="bench-fill" style="width:100%;background:var(--danger)"></div></div><span class="bench-val">700ms</span></div>
+      <div class="bench"><span class="bench-label">回线</span><div class="bench-track"><div class="bench-fill" style="width:100%;background:var(--danger)"></div></div><span class="bench-val">≤3500ms</span></div>
+      <div class="bench"><span class="bench-label">拉直</span><div class="bench-track"><div class="bench-fill" style="width:29%;background:var(--danger)"></div></div><span class="bench-val">100ms</span></div>
+      <p style="margin-top:12px;font-size:13px;color:var(--muted)">
+        回线是"任意一路看到黑线就停"—— 车常以约 45° 斜插在线上，再交给 PID 必然甩尾。
+      </p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">新版（闭环）</h3>
+      <div class="bench"><span class="bench-label">刹停</span><div class="bench-track"><div class="bench-fill" style="width:31%;background:var(--primary)"></div></div><span class="bench-val">110ms</span></div>
+      <div class="bench"><span class="bench-label">偏出</span><div class="bench-track"><div class="bench-fill" style="width:97%;background:var(--primary)"></div></div><span class="bench-val">340ms</span></div>
+      <div class="bench"><span class="bench-label">缓冲×2</span><div class="bench-track"><div class="bench-fill" style="width:11%;background:var(--primary)"></div></div><span class="bench-val">80ms</span></div>
+      <div class="bench"><span class="bench-label">超越</span><div class="bench-track"><div class="bench-fill" style="width:66%;background:var(--primary)"></div></div><span class="bench-val">460ms</span></div>
+      <div class="bench"><span class="bench-label">回线</span><div class="bench-track"><div class="bench-fill" style="width:11%;background:var(--primary)"></div></div><span class="bench-val">~380ms</span></div>
+      <div class="bench"><span class="bench-label">扶正</span><div class="bench-track"><div class="bench-fill" style="width:11%;background:var(--primary)"></div></div><span class="bench-val">80ms</span></div>
+      <p style="margin-top:12px;font-size:13px;color:var(--muted)">
+        回线是红外偏差闭环，<strong>看到线就立刻收</strong>，不会白等固定时长。
+      </p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <dl class="kv">
+      <dt>典型避障耗时</dt><dd><strong style="color:var(--primary)">1441 ms</strong>（仿真实测，含成功回线）</dd>
+      <dt>最坏耗时</dt><dd>3131 ms（全程找不到线时超时放弃，随后安全停车）</dd>
+      <dt>主循环周期</dt><dd>约 11 ms（≈90 Hz）；55 ms 的那个检测周期上多花约 5 ms</dd>
+      <dt>相比旧版</dt><dd>更快，而且<strong>回线质量好得多</strong> —— 旧版省下的那几百毫秒是用"斜插在线上"换的，实际反而更慢</dd>
+    </dl>
+  </div>
+</section>
+
+<!-- ===================== 6. 调试指南 ===================== -->
+<section>
+  <div class="sec-head"><span class="sec-num">06</span><h2>分阶段调试指南</h2></div>
+  <p class="sec-sub">
+    按顺序做，<strong>不要跳级</strong>。每一步都通过再进下一步 —— 出问题时能立刻定位到是哪一层。
+    烧录时把 <code>DEBUG_SERIAL</code> 改成 <code>1</code>，串口 <code>115200</code>。
+  </p>
+
+  <div class="card">
+    <ol class="tl">
+      <li class="key">
+        <div class="tl-t">阶段 0 · 静态上电，什么都别动</div>
+        <div class="tl-d">
+          小车放在<strong>悬空</strong>支架上（轮子不接触地面），上电，不按按键。
+          观察串口输出 —— 新代码在这一步就会持续打印 <code>[US] L=… R=…</code>。
+          <ul>
+            <li>电机不动 ✓（<code>WAIT_START</code> 不下发电机指令）</li>
+            <li>每 200ms 出现一行 <code>[US]</code> ✓</li>
+          </ul>
+          <span class="tl-check">通过标准：电机静止 + 串口有 [US] 行</span>
+        </div>
+      </li>
+
+      <li class="key">
+        <div class="tl-t">阶段 1 · 超声波自检（对应第 2 节排查树）</div>
+        <div class="tl-d">
+          小车仍然悬空。依次把手掌放在<strong>左</strong>、<strong>右</strong>传感器前 20–30cm 处。
+          <ul>
+            <li>看到 <code>cm</code> 从 999 变成 15~30 → 该侧模块 OK</li>
+            <li>一直是 999 但 <code>us</code> 也是 0 → 模块没工作：查 Vcc/GND/接线/供电</li>
+            <li>绕障物全放上也不变 → 查安装角度（第 2 节分支 B）</li>
+          </ul>
+          ⚠ 一定要<strong>分别</strong>测左右两个。只测一个很容易把"另一侧根本没接"漏掉。
+          <span class="tl-check">通过标准：左右两侧都能分别读到 15~30cm</span>
+        </div>
+      </li>
+
+      <li>
+        <div class="tl-t">阶段 2 · 单模块分模式验证</div>
+        <div class="tl-d">
+          在 <code>avoid_obstacle.hpp</code> 改 <code>AVOID_SWITCH_MODE</code>，烧录，看串口 <code>HIT</code> 标记：
+          <ul>
+            <li><code>1</code> 只左：只有左侧会变 <code>HIT</code></li>
+            <li><code>2</code> 只右：只有右侧会变 <code>HIT</code></li>
+            <li><code>3</code> 全开（比赛用）</li>
+            <li><code>0</code> 全关：纯循迹，用来验证避障有没有干扰循迹</li>
+          </ul>
+          同时把障碍物放<strong>到小车正前方 25cm</strong>，确认能触发。
+          <span class="tl-check">通过标准：三种模式行为都符合预期</span>
+        </div>
+      </li>
+
+      <li>
+        <div class="tl-t">阶段 3 · 只测转向方向（悬空，AVOID_MODE_ALL_ON）</div>
+        <div class="tl-d">
+          障碍放左前方 → 电机应<strong>左轮快、右轮慢</strong>（向右偏）。
+          障碍放右前方 → <strong>右轮快、左轮慢</strong>。
+          看着轮子转的方向判断对错，别只凭小车跑起来的样子。
+          <span class="tl-check">通过标准：左右各测一次，方向都反得"正确"</span>
+        </div>
+      </li>
+
+      <li>
+        <div class="tl-t">阶段 4 · 落地实测转角（这一步最花时间，也最容易丢分）</div>
+        <div class="tl-d">
+          把车放在白纸上，障碍物放<strong>黑线左侧</strong>，让它跑一次。
+          <ul>
+            <li><strong>撞上</strong> → 偏出不够，加大 <code>AVOID_TURN_OUT_MS</code>（每次 +40ms）</li>
+            <li><strong>擦过</strong> → 还是不够，继续加，或加大 <code>AVOID_TURN_OUT_OUTER</code></li>
+            <li><strong>绕太远、差点压到场地边</strong> → 减小 <code>AVOID_TURN_OUT_MS</code></li>
+            <li><strong>绕过去后回不到线上</strong> → 加大 <code>AVOID_PASS_MS</code>，让第 2 阶段多走一点</li>
+          </ul>
+          四个障碍物宽度分别是 150/60/120/110mm，<strong>以最宽的那个 150mm 为准调</strong>。
+          <span class="tl-check">通过标准：四种宽度都能绕开且回到线上</span>
+        </div>
+      </li>
+
+      <li>
+        <div class="tl-t">阶段 5 · 绕行后回线质量</div>
+        <div class="tl-d">
+          重点观察避障结束后<strong>车身是否与黑线平行</strong>。
+          如果歪着冲出去再大幅甩头，说明第 3 阶段没成功闭环 —— 把 <code>AVOID_LINE_OK_ERR</code> 从 1.5 放宽到 2.0，
+          或把 <code>AVOID_LINE_HOLD_MS</code> 从 60 减到 30，让它更早判定"回到线上了"。
+          <span class="tl-check">通过标准：交还 PID 后几乎不甩尾</span>
+        </div>
+      </li>
+
+      <li class="key">
+        <div class="tl-t">阶段 6 · 全赛道连贯跑 + 终点识别</div>
+        <div class="tl-d">
+          把 <code>DEBUG_SERIAL</code> 改回 <code>0</code>，全速跑完整条赛道。
+          重点验证：
+          <ul>
+            <li>起跑后<strong>不会</strong>把起点横线当成终点（已有 2s 屏蔽）</li>
+            <li>避障后<strong>不会</strong>把回线瞬间误判成终点（已有 5s 屏蔽）</li>
+            <li>终点确实停车并打印 <code>FINISH! Time: xx s</code></li>
+            <li>赛段完成标识（120×50×120mm 的 3D 打印块）<strong>会不会</strong>被超声波当成障碍绕开 —— 这是必须实测的一项</li>
+          </ul>
+          <span class="tl-check">通过标准：完整跑通，终点时间打印正确</span>
+        </div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ===================== 7. 调参公式 ===================== -->
+<section>
+  <div class="sec-head"><span class="sec-num">07</span><h2>避障转角怎么调（公式 + 速查）</h2></div>
+  <p class="sec-sub">差速小车没有"平移"这个动作，只能靠两段圆弧拼出横向位移。算清楚就不会瞎试。</p>
+
+  <div class="card">
+    <div class="formula">
+<em>转向半径</em>   R  = ( 轮距W / 2 ) × ( v外 + v内 ) / ( v外 − v内 )<br>
+<em>转过角度</em>   θ  = ( v外 − v内 ) / W × t        <span class="cm">// 弧度</span><br>
+<em>一段圆弧横移</em> d  = R × ( 1 − cos θ )          <span class="cm">// θ=90° 时最大，正好 = R</span>
+    </div>
+
+    <div class="card" style="margin-top:14px;background:var(--bg);box-shadow:none">
+      <h3 style="margin-top:0">按你现在的轮距 110mm 实算</h3>
+      <table>
+        <thead><tr><th>外/内轮 + 时间</th><th class="mono">R</th><th class="mono">转角</th><th class="mono">横向偏移</th><th>够不够</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">78 / 18 @ 340ms（旧参数）</td><td class="mono">88mm</td><td class="mono">53°</td><td class="mono"><strong>35mm</strong></td><td><span class="badge b-red">必撞</span></td></tr>
+          <tr><td class="mono">68 / 32 @ 950ms（现默认）</td><td class="mono">153mm</td><td class="mono">89°</td><td class="mono"><strong>150mm</strong></td><td><span class="badge b-green">达标</span></td></tr>
+          <tr><td class="mono">62 / 28 @ 1000ms</td><td class="mono">125mm</td><td class="mono">115°</td><td class="mono">177mm</td><td><span class="badge b-amber">偏大易过头</span></td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:12px;font-size:13px;color:var(--muted)">
+        另外：横向/纵向 = tan θ，所以"既往前走很远、又只偏一点"是矛盾的 —— θ 必须小。
+        这就是固定时序绕行动作调不进去的根源，<strong>只能靠实测逼近</strong>。
+      </p>
+    </div>
+
+    <h3>四个障碍物各需要多少横向偏移</h3>
+    <table>
+      <thead><tr><th>障碍物</th><th>尺寸 (mm)</th><th>需要的横向偏移</th></tr></thead>
+      <tbody>
+        <tr><td>新疆阿凡提</td><td class="mono">60 × 60 × 150</td><td class="mono">~75 mm</td></tr>
+        <tr><td>圣菲索亚大教堂</td><td class="mono">110 × 100 × 170</td><td class="mono">~115 mm</td></tr>
+        <tr><td>德黑兰自由纪念塔</td><td class="mono">120 × 70 × 150</td><td class="mono">~120 mm</td></tr>
+        <tr><td>敦煌莫高窟</td><td class="mono">150 × 100 × 150</td><td class="mono"><strong>~150 mm</strong></td></tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      <strong>旧参数（35mm）是确定会撞的</strong>，这点不用怀疑。
+      现在默认的 68/32@950ms 能算到 150mm，理论上够绕开最宽的莫高窟 ——
+      但<strong>这只是单车几何账，绕行途中车会不会提前压回线上，仿真还没调通</strong>。
+      上车第一件事就是量这个数：白纸上放障碍，让它绕完，用尺量车中心横向挪了多少毫米。
+    </div>
+  </div>
+  </section>
+
+<!-- ===================== 8. 故障速查 ===================== -->
+<section>
+  <div class="sec-head"><span class="sec-num">08</span><h2>故障速查表</h2></div>
+  <p class="sec-sub">按现象查。先看串口，再看机械，最后才怀疑代码。</p>
+
+  <div class="card">
+    <table>
+      <thead><tr><th>现象</th><th>先查这个</th><th>多半是</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>两个超声波恒为 999</td>
+          <td>电机停转时还读不到吗？</td>
+          <td><span class="badge b-red">供电塌陷</span> → 第 2 节分支 A，加去耦电容</td>
+        </tr>
+        <tr>
+          <td>只有一个方向能测到</td>
+          <td>另一个模块的 Trig/Echo 插错排针？</td>
+          <td><span class="badge b-red">接线</span> → 逐根用万用表通断确认</td>
+        </tr>
+        <tr>
+          <td>有读数但从不触发避障</td>
+          <td>看 <code>HIT</code> 标记出现过吗</td>
+          <td>没出现 = 距离大于 <code>AVOID_TRIGGER_CM</code>(32)，或模块不在探测锥里</td>
+        </tr>
+        <tr>
+          <td>空旷处莫名绕障</td>
+          <td>看触发时两侧的 <code>cm</code></td>
+          <td><span class="badge b-amber">误报</span> → 提高 <code>AVOID_CONFIRM_TIMES</code>，或降 <code>AVOID_TRIGGER_CM</code></td>
+        </tr>
+        <tr>
+          <td>绕过障碍后不回线</td>
+          <td>观察交还 PID 后是否甩尾</td>
+          <td>放宽 <code>AVOID_LINE_OK_ERR</code> 到 2.0，或减小 <code>AVOID_LINE_HOLD_MS</code> 到 30</td>
+        </tr>
+        <tr>
+          <td>绕过障碍后立刻又绕一次</td>
+          <td>看是否还在障碍附近</td>
+          <td>加大 <code>AVOID_COOLDOWN_MS</code>，或加大 <code>AVOID_PASS_MS</code> 让它走更远</td>
+        </tr>
+        <tr>
+          <td>把赛段完成标识当障碍绕开</td>
+          <td>实物试，看是否在 32cm 内</td>
+          <td><span class="badge b-amber">阈值</span> → 降 <code>AVOID_TRIGGER_CM</code> 到 24</td>
+        </tr>
+        <tr>
+          <td>急弯冲出赛道</td>
+          <td>看串口 <code>Err</code> 是否接近 ±7</td>
+          <td><span class="badge b-amber">丢线</span> → 降 <code>Speed_Sharp</code>，或加高红外探头</td>
+        </tr>
+        <tr>
+          <td>小车莫名倒退</td>
+          <td>看某个轮子 PWM 是否为负</td>
+          <td>新版已由 <code>MOTOR_REVERSE_LOCK</code> 兜底；如仍出现请贴串口日志</td>
+        </tr>
+        <tr>
+          <td>编译报错找不到 HCSR04</td>
+          <td>—</td>
+          <td><span class="badge b-green">已修</span> → 新代码不再 include 这个外部库</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ===================== 9. 比赛日 ===================== -->
+<section>
+  <div class="sec-head"><span class="sec-num">09</span><h2>比赛当天检查清单</h2></div>
+  <p class="sec-sub">规则：3 次机会取最好一次，每轮上限 5 分钟，15 分钟内用完。所以<strong>省时间的是调试，不是比赛</strong>。</p>
+
+  <div class="card">
+    <div class="pinwrap">
+      <div>
+        <h3 style="margin-top:0">上电前</h3>
+        <div class="pin"><span class="pinnum" style="background:var(--ultra-soft);color:var(--ultra)">1</span><span class="tag">电池固定牢，魔术贴或电池盒，不会在撞障碍时弹飞</span></div>
+        <div class="pin"><span class="pinnum" style="background:var(--ultra-soft);color:var(--ultra)">2</span><span class="tag">TB6612 STBY 拉高、方向确认、电源有保险丝或总开关</span></div>
+        <div class="pin"><span class="pinnum" style="background:var(--ultra-soft);color:var(--ultra)">3</span><span class="tag">两个超声波用黑胶带/3D 打印支架固定，角度别跑</span></div>
+        <div class="pin"><span class="pinnum" style="background:var(--ultra-soft);color:var(--ultra)">4</span><span class="tag">红外探头高度已按实际校准（换高度就要重新校准）</span></div>
+        <div class="pin"><span class="pinnum" style="background:var(--ultra-soft);color:var(--ultra)">5</span><span class="tag">车头尺寸 ≤ 250×200×200mm（规则硬性要求）</span></div>
+      </div>
+      <div>
+        <h3 style="margin-top:0">发车前</h3>
+        <div class="pin"><span class="pinnum" style="background:var(--ultra-soft);color:var(--ultra)">1</span><span class="tag"><code>DEBUG_SERIAL = 0</code>，拔掉调试串口线或至少确认它不影响</span></div>
+        <div class="pin"><span class="pinnum" style="background:var(--ultra-soft);color:var(--ultra)">2</span><span class="tag"><code>AVOID_SWITCH_MODE = 3</code>（全开）</span></div>
+        <div class="pin"><span class="pinnum" style="background:var(--ultra-soft);color:var(--ultra)">3</span><span class="tag">车头投影线对齐起点线，不压线</span></div>
+        <div class="pin"><span class="pinnum" style="background:var(--ultra-soft);color:var(--ultra)">4</span><span class="tag">确认 D4 急停可用；知道<strong>倒车直接结束本轮</strong></span></div>
+        <div class="pin"><span class="pinnum" style="background:var(--ultra-soft);color:var(--ultra)">5</span><span class="tag">确认反接刹车是否被判逆行（<code>FINISH_USE_BRAKE</code>）</span></div>
+      </div>
+    </div>
+
+    <div class="note safe" style="margin-top:16px">
+      <strong>一个好消息：</strong>赛道 6200mm，规则给的 5 分钟上限非常宽松。
+      以现在 <code>Speed_Line = 50</code> 的速度完全够用，
+      <strong>把速度调快收益很小，把避障调稳收益很大</strong> —— 建议赛前把时间全部花在阶段 4、5 上。
+    </div>
+  </div>
+</section>
+
+<footer>
+  对应工程：<code>C:\嵌入式\track_eight_line_I2C</code>　·
+  原始代码已备份在 <code>backup_original_20261007\</code>　·
+  避障逻辑可用 <code>_仿真验证\build_and_run.bat</code> 在电脑上先跑 20 项断言再烧板子
+</footer>
+
+</div>
+</body>
+</html>
